@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>AURA – Разписание</title>
+<style>
+body{font-family:Arial;margin:0;background:#f5f0ea}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px;background:#3b3631;color:#fff}
+.container{padding:12px}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.slot{border-radius:8px;padding:10px;display:flex;justify-content:space-between;cursor:pointer}
+.slot.free{background:#eaffea}
+.slot.booked{background:#ffecec}
+.help{font-size:12px}
+.badge{background:#8a2a2a;color:#fff;font-size:11px;padding:2px 6px;border-radius:4px}
+#form,#history{background:#fff;padding:10px;border-radius:8px;margin-bottom:12px}
+input,select,button{width:100%;padding:6px;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div id="splash" style="position:fixed;inset:0;background:#e9e5df;display:flex;align-items:center;justify-content:center;z-index:9999;">
+<div style="text-align:center">
+<div style="font-size:42px;font-weight:800">AURA</div>
+<div>Massage Studio</div>
+</div>
+</div>
+
+<header>
+<button id="prev">◀</button>
+<input type="date" id="calendar">
+<button id="next">▶</button>
+</header>
+
+<div class="container">
+
+<div id="form">
+<h3>Нов масаж</h3>
+<input id="name" placeholder="Име">
+<input id="phone" placeholder="Телефон">
+<select id="duration">
+<option value="30">30 мин</option>
+<option value="60">60 мин</option>
+</select>
+<select id="packageSelect">
+<option value="">Единичен</option>
+<option value="5">Пакет 5</option>
+<option value="10">Пакет 10</option>
+</select>
+<select id="visitNo" style="display:none"></select>
+<select id="time"></select>
+<button id="save">Запази</button>
+</div>
+
+<div class="slots" id="slots"></div>
+
+<div id="history">
+<h3>История на клиента</h3>
+<div id="historyContent">Кликни върху зает час</div>
+</div>
+
+</div>
+
+<script>
+// SPLASH
+setTimeout(()=>document.getElementById('splash').style.display='none',1200)
+
+// Елементи
+const nameInput = document.getElementById('name')
+const phoneInput = document.getElementById('phone')
+const durationSelect = document.getElementById('duration')
+const packageSelect = document.getElementById('packageSelect')
+const visitNo = document.getElementById('visitNo')
+const timeSelect = document.getElementById('time')
+const calendar = document.getElementById('calendar')
+const slotsDiv = document.getElementById('slots')
+const historyContent = document.getElementById('historyContent')
+const saveBtn = document.getElementById('save')
+const prevBtn = document.getElementById('prev')
+const nextBtn = document.getElementById('next')
+
+// DATE
+let current = new Date()
+const fmt = d => d.toISOString().split('T')[0]
+calendar.value = fmt(current)
+prevBtn.onclick = () => {current.setDate(current.getDate()-1);calendar.value=fmt(current);render()}
+nextBtn.onclick = () => {current.setDate(current.getDate()+1);calendar.value=fmt(current);render()}
+calendar.onchange = () => {current=new Date(calendar.value);render()}
+
+// TIMES
+const times=[]
+for(let h=9;h<19;h++){
+ times.push(`${String(h).padStart(2,'0')}:00`)
+ times.push(`${String(h).padStart(2,'0')}:30`)
+}
+times.forEach(t=>{
+ const o=document.createElement('option')
+ o.value=o.textContent=t
+ timeSelect.appendChild(o)
+})
+
+// STORAGE
+const load = k => JSON.parse(localStorage.getItem(k)||'{}')
+const saveData = (k,v) => localStorage.setItem(k,JSON.stringify(v))
+
+// PACKAGE UI
+packageSelect.onchange = ()=>{
+ visitNo.innerHTML=''
+ if(!packageSelect.value){visitNo.style.display='none';return}
+ visitNo.style.display='block'
+ for(let i=1;i<=packageSelect.value;i++){
+   const o=document.createElement('option')
+   o.value=o.textContent=i
+   visitNo.appendChild(o)
+ }
+}
+
+// SAVE – окончателна версия
+saveBtn.onclick = ()=>{
+ if(!nameInput.value || !phoneInput.value) return alert('Липсват данни')
+
+ const date = fmt(current)
+ const schedule = load('schedule')
+ schedule[date] = schedule[date] || {}
+
+ const idx = times.indexOf(timeSelect.value)
+ const need = durationSelect.value==60?2:1
+
+ for(let i=0;i<need;i++){
+   if(schedule[date][times[idx+i]]) return alert('Часът е зает')
+ }
+
+ const clients = load('clients')
+ let c = clients[phoneInput.value]
+
+ if(!c){
+   c = {name:nameInput.value, package:+packageSelect.value||0, used:0, history:[]}
+ }
+
+ let visitNumber = ''
+ if(c.package){
+   c.used++
+   visitNumber = `${c.used}/${c.package}`
+   if(c.used===c.package) alert('⚠ Последен масаж от пакета')
+ } else {
+   c.used++
+ }
+
+ schedule[date][timeSelect.value] = {
+   name: nameInput.value,
+   phone: phoneInput.value,
+   badge: visitNumber,
+   duration: durationSelect.value
+ }
+
+ c.history.push({date,time:timeSelect.value,duration:durationSelect.value})
+ clients[phoneInput.value] = c
+
+ saveData('schedule',schedule)
+ saveData('clients',clients)
+
+ render()
+}
+
+// HISTORY – финална версия с изчистване на слотове
+function showHistory(phone){
+  const clients = load('clients')
+  const schedule = load('schedule')
+  const c = clients[phone]
+  if(!c) return
+
+  let used = c.used || 0
+  let total = c.package || 0
+
+  let historyHtml = ''
+  if(c.history && c.history.length){
+    historyHtml = c.history.map((h,i)=>`${i+1}. ${h.date} ${h.time} (${h.duration} мин)`).join('<br>')
+  }
+
+  historyContent.innerHTML = `
+    <b>${c.name}</b><br>
+    Масажи: ${used}${total ? '/' + total : ''}<br><br>
+    ${historyHtml}<br><br>
+    <button id="clearHistoryBtn">Изчисти историята</button>
+  `
+
+  document.getElementById('clearHistoryBtn').onclick = ()=>{
+    if(confirm('Сигурни ли сте, че искате да изчистите историята на този клиент?')){
+      c.history = []
+      c.used = 0
+      clients[phone] = c
+      saveData('clients', clients)
+
+      // Освобождаване на всички слотове на този клиент
+      for(const date in schedule){
+        for(const time in schedule[date]){
+          if(schedule[date][time].phone === phone){
+            delete schedule[date][time]
+          }
+        }
+      }
+      saveData('schedule', schedule)
+
+      historyContent.innerHTML = 'Историята е изчистена.'
+      render()
+    }
+  }
+}
+
+// RENDER
+function render(){
+ slotsDiv.innerHTML = ''
+ const day = load('schedule')[fmt(current)] || {}
+
+ times.forEach(t=>{
+   const b = day[t] || null
+   const d = document.createElement('div')
+   d.className = 'slot ' + (b ? 'booked' : 'free')
+   d.innerHTML = `
+     <div>
+       <b>${t}</b>
+       ${b ? `<div class="help">${b.name}${b.badge?` <span class="badge">${b.badge}</span>`:''}</div>` : ''}
+     </div>
+     <span>${b?'Заето':'Свободно'}</span>
+   `
+   if(b) d.onclick = ()=>showHistory(b.phone)
+   slotsDiv.appendChild(d)
+ })
+}
+
+render()
+</script>
+</body>
+</html>
