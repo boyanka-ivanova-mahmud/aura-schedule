@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>AURA – Разписание</title>
+<style>
+body{font-family:Arial;margin:0;background:#f5f0ea}
+header{display:flex;justify-content:center;align-items:center;padding:10px;background:#3b3631;color:#fff;font-size:18px;gap:10px}
+#calendar{font-size:24px;text-align:center;padding:6px}
+.container{padding:12px}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.slot{border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;position:relative;cursor:pointer;font-size:16px}
+.slot.free{background:#eaffea}
+.slot.booked{background:#f44336;color:#fff}
+.slot.paid{background:#4caf50;color:#fff}
+.slot.packagePaid{background:#ff9800;color:#fff}
+button{padding:6px;margin-left:4px;cursor:pointer;border:none;border-radius:4px;background:#333;color:#fff}
+button:hover{opacity:0.9}
+#form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px}
+select,input{padding:6px;margin-bottom:6px;font-size:16px}
+#save{padding:12px;font-size:20px}
+</style>
+</head>
+<body>
+
+<div id="splash" style="position:fixed;inset:0;background:#e9e5df;display:flex;align-items:center;justify-content:center;z-index:9999;">
+<div style="text-align:center">
+<div style="font-size:42px;font-weight:800">AURA</div>
+<div>Massage Studio</div>
+</div>
+</div>
+
+<header>
+<button id="prev">◀</button>
+<input type="date" id="calendar">
+<button id="next">▶</button>
+</header>
+
+<div class="container">
+<div id="form">
+<h3>Нов масаж</h3>
+<input id="name" placeholder="Име">
+<select id="duration">
+<option value="30">30 мин</option>
+<option value="60">60 мин</option>
+</select>
+<select id="packageSelect">
+<option value="">Единичен</option>
+<option value="5">Пакет 5</option>
+<option value="10">Пакет 10</option>
+</select>
+<select id="time"></select>
+<button id="save">Запази</button>
+</div>
+
+<div class="slots" id="slots"></div>
+</div>
+
+<script>
+// SPLASH
+setTimeout(()=>document.getElementById('splash').style.display='none',1200)
+
+// GLOBAL
+let activePackageClient = null
+
+// Елементи
+const nameInput=document.getElementById('name')
+const durationSelect=document.getElementById('duration')
+const timeSelect=document.getElementById('time')
+const packageSelect=document.getElementById('packageSelect')
+const calendar=document.getElementById('calendar')
+const slotsDiv=document.getElementById('slots')
+const saveBtn=document.getElementById('save')
+const prevBtn=document.getElementById('prev')
+const nextBtn=document.getElementById('next')
+
+// DATE
+let current=new Date()
+const fmt=d=>d.toISOString().split('T')[0]
+calendar.value=fmt(current)
+prevBtn.onclick=()=>{current.setDate(current.getDate()-1);calendar.value=fmt(current);render()}
+nextBtn.onclick=()=>{current.setDate(current.getDate()+1);calendar.value=fmt(current);render()}
+calendar.onchange=()=>{current=new Date(calendar.value);render()}
+
+// TIMES
+const times=[]
+for(let h=9;h<19;h++){
+ times.push(`${String(h).padStart(2,'0')}:00`)
+ times.push(`${String(h).padStart(2,'0')}:30`)
+}
+times.forEach(t=>{
+ const o=document.createElement('option')
+ o.value=o.textContent=t
+ timeSelect.appendChild(o)
+})
+
+// STORAGE
+const load=k=>JSON.parse(localStorage.getItem(k)||'{}')
+const saveData=(k,v)=>localStorage.setItem(k,JSON.stringify(v))
+
+// SAVE
+saveBtn.onclick=()=>{
+ if(!nameInput.value || !timeSelect.value){
+   alert('Моля, въведете име и изберете час');return
+ }
+
+ const date=fmt(current)
+ const schedule=load('schedule')
+ schedule[date]=schedule[date]||{}
+ const t=timeSelect.value
+ if(schedule[date][t]){alert('Часът е зает');return}
+
+ const clients=load('clients')
+
+ let c
+ if(activePackageClient){
+   c = clients[activePackageClient]
+ }else{
+   c = clients[nameInput.value] || {
+     name:nameInput.value,
+     package:+packageSelect.value||0,
+     used:0,
+     slots:[]
+   }
+ }
+
+ let slotNumber = c.used + 1
+ if(c.package && slotNumber>c.package) slotNumber = c.package
+ c.used = slotNumber
+
+ let slot={
+  name:c.name,
+  duration:+durationSelect.value,
+  paid:false,
+  package:c.package,
+  slotNumber:slotNumber,
+  packageTotal:c.package
+ }
+
+ schedule[date][t]=slot
+ c.slots.push({date,t})
+
+ if(durationSelect.value==60){
+   const idx=times.indexOf(t)
+   const nextSlot=times[idx+1]
+   if(nextSlot){
+     schedule[date][nextSlot]={...slot}
+     c.slots.push({date,t:nextSlot})
+   }
+ }
+
+ clients[c.name]=c
+ saveData('schedule',schedule)
+ saveData('clients',clients)
+
+ // ❌ Нулираме активния пакет само ако е приключил
+ if(c.package && c.used >= c.package){
+   activePackageClient = null
+   packageSelect.disabled = false
+   packageSelect.value = ""
+   nameInput.value = ""
+ } else if(!activePackageClient){
+   packageSelect.disabled = false
+ }
+
+ render()
+}
+
+// DELETE
+function deleteMassage(name,t){
+ const clients=load('clients')
+ const schedule=load('schedule')
+ const c=clients[name]
+ if(!c) return
+ c.slots=c.slots.filter(s=>!(s.t===t && s.date===fmt(current)))
+ if(schedule[fmt(current)]) delete schedule[fmt(current)][t]
+ saveData('clients',clients)
+ saveData('schedule',schedule)
+ render()
+}
+
+// PAID
+function markPaid(name){
+ const schedule=load('schedule')
+ Object.values(schedule).forEach(day=>{
+   Object.values(day).forEach(s=>{
+     if(s.name===name) s.paid=true
+   })
+ })
+ saveData('schedule',schedule)
+ render()
+}
+
+// RENDER
+function render(){
+ slotsDiv.innerHTML=''
+ const day=load('schedule')[fmt(current)]||{}
+ const hidden=new Set()
+
+ times.forEach(t=>{
+   if(hidden.has(t)) return
+   const b=day[t]
+   const d=document.createElement('div')
+
+   if(!b) d.className='slot free'
+   else if(b.paid) d.className=b.package?'slot packagePaid':'slot paid'
+   else d.className='slot booked'
+
+   if(b && b.duration==60){
+     const i=times.indexOf(t)
+     if(times[i+1]) hidden.add(times[i+1])
+   }
+
+   d.innerHTML=`
+    <div><b>${t}</b>${b? `<div>${b.name}${b.package?` (${b.slotNumber}/${b.packageTotal})`:''}</div>`:''}</div>
+    <span>${b?'Заето':'Свободно'}</span>
+   `
+
+   if(b){
+     d.onclick=()=>{
+       if(b.package){
+         activePackageClient=b.name
+         nameInput.value=b.name
+         packageSelect.value=b.package
+         packageSelect.disabled=true
+       }
+       d.innerHTML+=`
+        <div>
+          ${!b.paid?`<button onclick="event.stopPropagation();markPaid('${b.name}')">Платен</button>`:''}
+          <button onclick="event.stopPropagation();deleteMassage('${b.name}','${t}')">Изтрий</button>
+        </div>`
+     }
+   }
+
+   slotsDiv.appendChild(d)
+ })
+}
+
+render()
+</script>
+</body>
+</html>
