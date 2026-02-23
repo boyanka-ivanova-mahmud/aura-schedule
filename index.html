@@ -1,68 +1,56 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AURA – Разписание</title>
-  <link rel="manifest" href="manifest.json">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA – Разписание</title>
 
-  <style>
-    body{font-family:Arial;margin:0;background:#f5f0ea}
-    header{display:flex;justify-content:center;align-items:center;padding:10px;background:#3b3631;color:#fff;font-size:18px;gap:10px}
-    #calendar{font-size:24px;text-align:center;padding:6px}
-    .container{padding:12px}
-    .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-    .slot{border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:16px}
-    .slot.free{background:#eaffea}
-    .slot.booked{background:#f44336;color:#fff}
-    .slot.paid{background:#4caf50;color:#fff}
-    .slot.packagePaid{background:#ff9800;color:#fff}
-    button{padding:6px;margin-left:4px;border:none;border-radius:4px;background:#333;color:#fff}
-    #form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px}
-    select,input{padding:6px;margin-bottom:6px;font-size:16px}
-    #save{padding:12px;font-size:20px;width:100%}
-  </style>
+<style>
+body{font-family:Arial;margin:0;background:#f5f0ea}
+header{display:flex;justify-content:center;align-items:center;padding:10px;background:#3b3631;color:#fff;gap:10px}
+#calendar{font-size:22px;padding:6px}
+.container{padding:12px}
+.slot{padding:12px;border-radius:8px;display:flex;justify-content:space-between;cursor:pointer;margin-bottom:6px}
+.free{background:#eaffea}
+.booked{background:#f44336;color:#fff}
+.paid{background:#ff9800;color:#fff}
+#form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px}
+button{padding:6px;border:none;border-radius:4px;background:#333;color:#fff;margin-left:4px}
+</style>
 </head>
 
 <body>
 
-<!-- SPLASH -->
-<div id="splash" style="position:fixed;inset:0;background:#e9e5df;display:flex;align-items:center;justify-content:center;z-index:9999;">
-  <div style="text-align:center">
-    <div style="font-size:42px;font-weight:800">AURA</div>
-    <div>Massage Studio</div>
-  </div>
-</div>
-
 <header>
-  <button id="prev">◀</button>
-  <input type="date" id="calendar">
-  <button id="next">▶</button>
+<button id="prev">◀</button>
+<input type="date" id="calendar">
+<button id="next">▶</button>
 </header>
 
 <div class="container">
-  <div id="form">
-    <h3>Нов масаж</h3>
 
-    <input id="name" placeholder="Име">
+<div id="form">
+<h3>Нов масаж</h3>
 
-    <select id="duration">
-      <option value="30">30 мин</option>
-      <option value="60">60 мин</option>
-    </select>
+<input id="name" placeholder="Име"><br><br>
 
-    <select id="packageSelect">
-      <option value="">Единичен</option>
-      <option value="5">Пакет 5</option>
-      <option value="10">Пакет 10</option>
-    </select>
+<select id="duration">
+<option value="30">30 мин</option>
+<option value="60">60 мин</option>
+</select><br><br>
 
-    <select id="time"></select>
+<select id="package">
+<option value="">Единичен</option>
+<option value="5">Пакет 5</option>
+<option value="10">Пакет 10</option>
+</select><br><br>
 
-    <button id="save">Запази</button>
-  </div>
+<select id="time"></select><br><br>
 
-  <div class="slots" id="slots"></div>
+<button id="save">Запази</button>
+</div>
+
+<div id="slots"></div>
 </div>
 
 <!-- FIREBASE -->
@@ -70,173 +58,138 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-  firebase.initializeApp({
-    apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
-    authDomain: "aura-schedule.firebaseapp.com",
-    projectId: "aura-schedule"
-  });
-  const db = firebase.firestore();
+firebase.initializeApp({
+  apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
+  authDomain: "aura-schedule.firebaseapp.com",
+  projectId: "aura-schedule",
+  storageBucket: "aura-schedule.firebasestorage.app",
+  messagingSenderId: "1061955157940",
+  appId: "1:1061955157940:web:7009801b6a5db594ccfce1"
+});
+const db = firebase.firestore();
 </script>
 
 <script>
-// SPLASH
-setTimeout(()=>document.getElementById('splash').style.display='none',1200)
-
-// ELEMENTS
-const nameInput=document.getElementById('name')
-const durationSelect=document.getElementById('duration')
-const timeSelect=document.getElementById('time')
-const packageSelect=document.getElementById('packageSelect')
-const calendar=document.getElementById('calendar')
-const slotsDiv=document.getElementById('slots')
-const saveBtn=document.getElementById('save')
-const prevBtn=document.getElementById('prev')
-const nextBtn=document.getElementById('next')
-
-// DATE
+// ===== DATE =====
 let current=new Date()
 const fmt=d=>d.toISOString().split('T')[0]
 calendar.value=fmt(current)
-prevBtn.onclick=()=>{current.setDate(current.getDate()-1);calendar.value=fmt(current);render()}
-nextBtn.onclick=()=>{current.setDate(current.getDate()+1);calendar.value=fmt(current);render()}
+prev.onclick=()=>{current.setDate(current.getDate()-1);calendar.value=fmt(current);render()}
+next.onclick=()=>{current.setDate(current.getDate()+1);calendar.value=fmt(current);render()}
 calendar.onchange=()=>{current=new Date(calendar.value);render()}
 
-// TIMES
+// ===== TIMES =====
 const times=[]
 for(let h=9;h<19;h++){
-  times.push(`${String(h).padStart(2,'0')}:00`)
-  times.push(`${String(h).padStart(2,'0')}:30`)
+ times.push(`${String(h).padStart(2,'0')}:00`)
+ times.push(`${String(h).padStart(2,'0')}:30`)
 }
 times.forEach(t=>{
-  const o=document.createElement('option')
-  o.value=o.textContent=t
-  timeSelect.appendChild(o)
+ const o=document.createElement('option')
+ o.value=o.textContent=t
+ time.appendChild(o)
 })
 
-// FIRESTORE HELPERS
-async function loadDay(){
-  const snap=await db.collection('schedule').doc(fmt(current)).get()
-  return snap.exists ? snap.data() : {}
+// ===== DB HELPERS =====
+const loadDay=async()=>{
+ const s=await db.collection('days').doc(fmt(current)).get()
+ return s.exists?s.data():{}
 }
-async function saveDay(data){
-  await db.collection('schedule').doc(fmt(current)).set(data)
+const saveDay=d=>db.collection('days').doc(fmt(current)).set(d)
+
+const loadClient=async n=>{
+ const s=await db.collection('clients').doc(n).get()
+ return s.exists?s.data():{}
 }
+const saveClient=(n,d)=>db.collection('clients').doc(n).set(d)
 
-// CLIENT PACKAGE HELPERS
-async function loadClient(name){
-  const ref=db.collection('clients').doc(name)
-  const snap=await ref.get()
-  return snap.exists ? snap.data() : null
-}
-async function saveClient(name,data){
-  await db.collection('clients').doc(name).set(data)
-}
+// ===== SAVE =====
+save.onclick=async()=>{
+ if(!name.value||!time.value)return
 
-// SAVE
-saveBtn.onclick=async ()=>{
-  if(!nameInput.value||!timeSelect.value)return
+ const day=await loadDay()
+ if(day[time.value])return
 
-  const day=await loadDay()
-  const t=timeSelect.value
-  if(day[t])return
+ let client=await loadClient(name.value)
+ if(!client.activePackage && package.value){
+   client.activePackage={total:+package.value,used:0,paid:false}
+ }
 
-  let slotNumber=0
-  let packageTotal=+packageSelect.value||0
+ let pkg=client.activePackage
+ let label=''
 
-  if(packageTotal){
-    let client=await loadClient(nameInput.value)
-    if(!client){
-      client={package:packageTotal,used:0}
-    }
-    if(client.used>=client.package){
-      alert('Пакетът е изчерпан')
-      return
-    }
-    client.used+=1
-    slotNumber=client.used
-    await saveClient(nameInput.value,client)
-  }
+ if(pkg){
+   pkg.used++
+   if(pkg.used>pkg.total){
+     pkg={total:pkg.total,used:1,paid:false}
+   }
+   client.activePackage=pkg
+   label=`${pkg.used}/${pkg.total}`
+ }
 
-  const slot={
-    name:nameInput.value,
-    duration:+durationSelect.value,
-    paid:false,
-    package:packageTotal,
-    slotNumber,
-    packageTotal
-  }
+ day[time.value]={
+  name:name.value,
+  duration:+duration.value,
+  paid:pkg?pkg.paid:false,
+  label
+ }
 
-  day[t]=slot
+ if(duration.value==60){
+  const i=times.indexOf(time.value)
+  if(times[i+1]) day[times[i+1]]={...day[time.value]}
+ }
 
-  if(durationSelect.value==60){
-    const i=times.indexOf(t)
-    if(times[i+1]) day[times[i+1]]={...slot}
-  }
-
-  await saveDay(day)
-  nameInput.value=''
-  packageSelect.value=''
-  render()
+ await saveClient(name.value,client)
+ await saveDay(day)
+ name.value=''
+ package.value=''
+ render()
 }
 
-// PAID
-async function markPaid(name){
-  const day=await loadDay()
-  Object.values(day).forEach(s=>{
-    if(s.name===name)s.paid=true
-  })
-  await saveDay(day)
-  render()
-}
-
-// DELETE
-async function deleteMassage(t){
-  const day=await loadDay()
-  delete day[t]
-  await saveDay(day)
-  render()
-}
-
-// RENDER
+// ===== RENDER =====
 async function render(){
-  slotsDiv.innerHTML=''
-  const day=await loadDay()
-  const hidden=new Set()
+ slots.innerHTML=''
+ const day=await loadDay()
+ const hidden=new Set()
 
-  times.forEach(t=>{
-    if(hidden.has(t))return
-    const b=day[t]
-    const d=document.createElement('div')
+ times.forEach(t=>{
+  if(hidden.has(t))return
+  const b=day[t]
+  const d=document.createElement('div')
 
-    if(!b)d.className='slot free'
-    else if(b.paid)d.className=b.package?'slot packagePaid':'slot paid'
-    else d.className='slot booked'
+  if(!b)d.className='slot free'
+  else if(b.paid)d.className='slot paid'
+  else d.className='slot booked'
 
-    if(b&&b.duration==60){
-      const i=times.indexOf(t)
-      if(times[i+1])hidden.add(times[i+1])
-    }
+  if(b&&b.duration==60){
+   const i=times.indexOf(t)
+   if(times[i+1])hidden.add(times[i+1])
+  }
 
-    d.innerHTML=`
-      <div>
-        <b>${t}</b>
-        ${b?`<div>${b.name}${b.package?` (${b.slotNumber}/${b.packageTotal})`:''}</div>`:''}
-      </div>
-      <span>${b?'Заето':'Свободно'}</span>
-    `
+  d.innerHTML=`
+   <div><b>${t}</b> ${b?`${b.name} ${b.label}`:'Свободно'}</div>
+   ${b?'<button onclick="payPackage(\''+b.name+'\')">Платен</button>':''}
+  `
+  slots.appendChild(d)
+ })
+}
 
-    if(b){
-      d.onclick=()=>{
-        d.innerHTML+=`
-          <div>
-            ${!b.paid?`<button onclick="event.stopPropagation();markPaid('${b.name}')">Платен</button>`:''}
-            <button onclick="event.stopPropagation();deleteMassage('${t}')">Изтрий</button>
-          </div>`
-      }
-    }
+// ===== PAY PACKAGE =====
+async function payPackage(name){
+ const client=await loadClient(name)
+ if(!client.activePackage)return
+ client.activePackage.paid=true
+ await saveClient(name,client)
 
-    slotsDiv.appendChild(d)
+ const snap=await db.collection('days').get()
+ snap.forEach(doc=>{
+  const d=doc.data()
+  Object.keys(d).forEach(t=>{
+   if(d[t].name===name)d[t].paid=true
   })
+  db.collection('days').doc(doc.id).set(d)
+ })
+ render()
 }
 
 render()
