@@ -1,28 +1,29 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA – Разписание</title>
 
-<title>AURA – Разписание</title>
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
 
-<style>
-body{font-family:Arial;margin:0;background:#f5f0ea}
-header{display:flex;justify-content:center;align-items:center;padding:10px;background:#3b3631;color:#fff;font-size:18px;gap:10px}
-#calendar{font-size:24px;text-align:center;padding:6px}
-.container{padding:12px}
-.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-.slot{border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:16px}
-.slot.free{background:#eaffea}
-.slot.booked{background:#f44336;color:#fff}
-.slot.paid{background:#4caf50;color:#fff}
-.slot.packagePaid{background:#ff9800;color:#fff}
-button{padding:6px;margin-left:4px;border:none;border-radius:4px;background:#333;color:#fff}
-#form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px}
-select,input{padding:6px;margin-bottom:6px;font-size:16px}
-#save{padding:12px;font-size:20px;width:100%}
-</style>
+  <style>
+    body{font-family:Arial;margin:0;background:#f5f0ea}
+    header{display:flex;justify-content:center;align-items:center;padding:10px;background:#3b3631;color:#fff;font-size:18px;gap:10px}
+    #calendar{font-size:24px;text-align:center;padding:6px}
+    .container{padding:12px}
+    .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+    .slot{border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:16px}
+    .slot.free{background:#eaffea}
+    .slot.booked{background:#f44336;color:#fff}
+    .slot.paid{background:#4caf50;color:#fff}
+    .slot.packagePaid{background:#ff9800;color:#fff}
+    button{padding:6px;margin-left:4px;border:none;border-radius:4px;background:#333;color:#fff}
+    #form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px}
+    select,input{padding:6px;margin-bottom:6px;font-size:16px}
+    #save{padding:12px;font-size:20px;width:100%}
+  </style>
 </head>
 
 <body>
@@ -66,17 +67,22 @@ select,input{padding:6px;margin-bottom:6px;font-size:16px}
   <div class="slots" id="slots"></div>
 </div>
 
-<!-- FIREBASE -->
+<!-- FIREBASE (COMPAT – стабилно за HTML) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-firebase.initializeApp({
-  apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
-  authDomain: "aura-schedule.firebaseapp.com",
-  projectId: "aura-schedule"
-});
-const db = firebase.firestore();
+  const firebaseConfig = {
+    apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
+    authDomain: "aura-schedule.firebaseapp.com",
+    projectId: "aura-schedule",
+    storageBucket: "aura-schedule.appspot.com",
+    messagingSenderId: "1061955157940",
+    appId: "1:1061955157940:web:7009801b6a5db594ccfce1"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 </script>
 
 <script>
@@ -114,15 +120,12 @@ times.forEach(t=>{
   timeSelect.appendChild(o)
 })
 
-// LOAD / SAVE
+// FIRESTORE HELPERS
 async function loadDay(){
-  try{
-    const snap=await db.collection('schedule').doc(fmt(current)).get()
-    return snap.exists ? snap.data() : {}
-  }catch{
-    return {}
-  }
+  const snap=await db.collection('schedule').doc(fmt(current)).get()
+  return snap.exists ? snap.data() : {}
 }
+
 async function saveDay(data){
   await db.collection('schedule').doc(fmt(current)).set(data)
 }
@@ -137,10 +140,12 @@ saveBtn.onclick=async ()=>{
 
   let used=0
   Object.values(day).forEach(s=>{
-    if(s.name===nameInput.value && s.package) used=Math.max(used,s.slotNumber)
+    if(s.name===nameInput.value && s.package){
+      used=Math.max(used,s.slotNumber)
+    }
   })
 
-  const slotNumber=packageSelect.value?used+1:0
+  const slotNumber=packageSelect.value ? used+1 : 0
 
   const slot={
     name:nameInput.value,
@@ -159,6 +164,7 @@ saveBtn.onclick=async ()=>{
   }
 
   await saveDay(day)
+
   nameInput.value=''
   packageSelect.value=''
   render()
@@ -203,7 +209,10 @@ async function render(){
     }
 
     d.innerHTML=`
-      <div><b>${t}</b>${b?`<div>${b.name}${b.package?` (${b.slotNumber}/${b.packageTotal})`:''}</div>`:''}</div>
+      <div>
+        <b>${t}</b>
+        ${b?`<div>${b.name}${b.package?` (${b.slotNumber}/${b.packageTotal})`:''}</div>`:''}
+      </div>
       <span>${b?'Заето':'Свободно'}</span>
     `
 
