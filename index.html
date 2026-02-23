@@ -179,14 +179,14 @@ saveBtn.onclick=async ()=>{
   render()
 }
 
-// PAID
-async function markPaid(name){
-  const day=await loadDay()
-  Object.values(day).forEach(s=>{
-    if(s.name===name)s.paid=true
-  })
-  await saveDay(day)
-  render()
+// ✅ ПРОМЕНЕНА ФУНКЦИЯ – САМО ТУК Е РАЗЛИКАТА
+async function markPaid(time){
+  const day = await loadDay()
+  if(day[time]){
+    day[time].paid = true
+    await saveDay(day)
+    render()
+  }
 }
 
 // DELETE
@@ -229,7 +229,7 @@ async function render(){
       d.onclick=()=>{
         d.innerHTML+=`
           <div>
-            ${!b.paid?`<button onclick="event.stopPropagation();markPaid('${b.name}')">Платен</button>`:''}
+            ${!b.paid?`<button onclick="event.stopPropagation();markPaid('${t}')">Платен</button>`:''}
             <button onclick="event.stopPropagation();deleteMassage('${t}')">Изтрий</button>
           </div>`
       }
