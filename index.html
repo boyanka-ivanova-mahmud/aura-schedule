@@ -157,14 +157,14 @@ saveBtn.onclick=async ()=>{
     await saveClient(nameInput.value,client)
   }
 
-  const slot={
-    name:nameInput.value,
-    duration:+durationSelect.value,
-    paid:false,
-    package:packageTotal,
-    slotNumber,
-    packageTotal
-  }
+const slot={
+  name:nameInput.value,
+  duration:+durationSelect.value,
+  paid: packageAlreadyPaid || false, 
+  package:packageTotal,
+  slotNumber,
+  packageTotal
+}
 
   day[t]=slot
 
@@ -244,3 +244,4 @@ render()
 
 </body>
 </html>
+
