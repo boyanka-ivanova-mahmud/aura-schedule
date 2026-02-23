@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AURA – Разписание</title>
-
-  <!-- PWA -->
   <link rel="manifest" href="manifest.json">
 
   <style>
@@ -67,21 +65,16 @@
   <div class="slots" id="slots"></div>
 </div>
 
-<!-- FIREBASE (COMPAT – стабилно за HTML) -->
+<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
+  firebase.initializeApp({
     apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
     authDomain: "aura-schedule.firebaseapp.com",
-    projectId: "aura-schedule",
-    storageBucket: "aura-schedule.appspot.com",
-    messagingSenderId: "1061955157940",
-    appId: "1:1061955157940:web:7009801b6a5db594ccfce1"
-  };
-
-  firebase.initializeApp(firebaseConfig);
+    projectId: "aura-schedule"
+  });
   const db = firebase.firestore();
 </script>
 
@@ -125,9 +118,18 @@ async function loadDay(){
   const snap=await db.collection('schedule').doc(fmt(current)).get()
   return snap.exists ? snap.data() : {}
 }
-
 async function saveDay(data){
   await db.collection('schedule').doc(fmt(current)).set(data)
+}
+
+// CLIENT PACKAGE HELPERS
+async function loadClient(name){
+  const ref=db.collection('clients').doc(name)
+  const snap=await ref.get()
+  return snap.exists ? snap.data() : null
+}
+async function saveClient(name,data){
+  await db.collection('clients').doc(name).set(data)
 }
 
 // SAVE
@@ -138,22 +140,30 @@ saveBtn.onclick=async ()=>{
   const t=timeSelect.value
   if(day[t])return
 
-  let used=0
-  Object.values(day).forEach(s=>{
-    if(s.name===nameInput.value && s.package){
-      used=Math.max(used,s.slotNumber)
-    }
-  })
+  let slotNumber=0
+  let packageTotal=+packageSelect.value||0
 
-  const slotNumber=packageSelect.value ? used+1 : 0
+  if(packageTotal){
+    let client=await loadClient(nameInput.value)
+    if(!client){
+      client={package:packageTotal,used:0}
+    }
+    if(client.used>=client.package){
+      alert('Пакетът е изчерпан')
+      return
+    }
+    client.used+=1
+    slotNumber=client.used
+    await saveClient(nameInput.value,client)
+  }
 
   const slot={
     name:nameInput.value,
     duration:+durationSelect.value,
     paid:false,
-    package:+packageSelect.value||0,
+    package:packageTotal,
     slotNumber,
-    packageTotal:+packageSelect.value||0
+    packageTotal
   }
 
   day[t]=slot
@@ -164,7 +174,6 @@ saveBtn.onclick=async ()=>{
   }
 
   await saveDay(day)
-
   nameInput.value=''
   packageSelect.value=''
   render()
