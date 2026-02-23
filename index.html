@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 
-<!-- ✅ ЗА ТЕЛЕФОН -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
 
@@ -65,12 +64,22 @@ select,input{padding:6px;margin-bottom:6px;font-size:16px}
   <div class="slots" id="slots"></div>
 </div>
 
+<!-- 🔥 FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
+  authDomain: "aura-schedule.firebaseapp.com",
+  projectId: "aura-schedule"
+});
+const db = firebase.firestore();
+</script>
+
 <script>
 // SPLASH
 setTimeout(()=>document.getElementById('splash').style.display='none',1200)
-
-// GLOBAL
-let activePackageClient=null
 
 // ELEMENTS
 const nameInput=document.getElementById('name')
@@ -103,75 +112,75 @@ times.forEach(t=>{
   timeSelect.appendChild(o)
 })
 
-// STORAGE
-const load=k=>JSON.parse(localStorage.getItem(k)||'{}')
-const saveData=(k,v)=>localStorage.setItem(k,JSON.stringify(v))
+// LOAD / SAVE (FIRESTORE)
+async function loadSchedule(){
+  const snap = await db.collection('schedule').doc(fmt(current)).get()
+  return snap.exists ? snap.data() : {}
+}
+
+async function saveSchedule(data){
+  await db.collection('schedule').doc(fmt(current)).set(data)
+}
 
 // SAVE
-saveBtn.onclick=()=>{
+saveBtn.onclick=async ()=>{
   if(!nameInput.value||!timeSelect.value)return
 
-  const date=fmt(current)
-  const schedule=load('schedule')
-  schedule[date]=schedule[date]||{}
+  const day = await loadSchedule()
   const t=timeSelect.value
-  if(schedule[date][t])return
+  if(day[t])return
 
-  const clients=load('clients')
-  let c=clients[nameInput.value]||{name:nameInput.value,package:+packageSelect.value||0,used:0}
+  let used = 0
+  Object.values(day).forEach(s=>{
+    if(s.name===nameInput.value) used = Math.max(used,s.slotNumber||0)
+  })
 
-  c.used=c.package?c.used+1:0
+  const slotNumber = packageSelect.value ? used+1 : 0
 
   const slot={
-    name:c.name,
+    name:nameInput.value,
     duration:+durationSelect.value,
     paid:false,
-    package:c.package,
-    slotNumber:c.used,
-    packageTotal:c.package
+    package:+packageSelect.value||0,
+    slotNumber,
+    packageTotal:+packageSelect.value||0
   }
 
-  schedule[date][t]=slot
+  day[t]=slot
 
   if(durationSelect.value==60){
-    const idx=times.indexOf(t)
-    const nextSlot=times[idx+1]
-    if(nextSlot)schedule[date][nextSlot]={...slot}
+    const i=times.indexOf(t)
+    if(times[i+1]) day[times[i+1]]={...slot}
   }
 
-  clients[c.name]=c
-  saveData('schedule',schedule)
-  saveData('clients',clients)
-
+  await saveSchedule(day)
   nameInput.value=''
   packageSelect.value=''
   render()
 }
 
 // PAID
-function markPaid(name){
-  const schedule=load('schedule')
-  Object.values(schedule).forEach(day=>{
-    Object.values(day).forEach(s=>{
-      if(s.name===name)s.paid=true
-    })
+async function markPaid(name){
+  const day = await loadSchedule()
+  Object.values(day).forEach(s=>{
+    if(s.name===name) s.paid=true
   })
-  saveData('schedule',schedule)
+  await saveSchedule(day)
   render()
 }
 
 // DELETE
-function deleteMassage(name,t){
-  const schedule=load('schedule')
-  if(schedule[fmt(current)])delete schedule[fmt(current)][t]
-  saveData('schedule',schedule)
+async function deleteMassage(name,t){
+  const day = await loadSchedule()
+  delete day[t]
+  await saveSchedule(day)
   render()
 }
 
 // RENDER
-function render(){
+async function render(){
   slotsDiv.innerHTML=''
-  const day=load('schedule')[fmt(current)]||{}
+  const day = await loadSchedule()
   const hidden=new Set()
 
   times.forEach(t=>{
@@ -206,6 +215,7 @@ function render(){
     slotsDiv.appendChild(d)
   })
 }
+
 render()
 </script>
 
