@@ -8,55 +8,55 @@
 <style>
 body{font-family:Arial;margin:0;background:#f5f0ea}
 header{display:flex;justify-content:center;align-items:center;padding:10px;background:#3b3631;color:#fff;font-size:18px;gap:10px}
-#calendar{font-size:24px;text-align:center;padding:6px}
+#calendar{font-size:22px;text-align:center;padding:6px}
 .container{padding:12px}
-.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-.slot{border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:16px}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.slot{border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
 .slot.free{background:#eaffea}
 .slot.booked{background:#f44336;color:#fff}
 .slot.paid{background:#4caf50;color:#fff}
 .slot.packagePaid{background:#ff9800;color:#fff}
 button{padding:6px;border:none;border-radius:4px;background:#333;color:#fff}
 #form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px}
-#save{padding:12px;font-size:20px;width:100%}
+select,input{padding:6px;margin-bottom:6px;width:100%}
+#save{padding:12px;font-size:18px}
 </style>
 </head>
 
 <body>
 
 <header>
-  <button id="prev">◀</button>
-  <input type="date" id="calendar">
-  <button id="next">▶</button>
+<button id="prev">◀</button>
+<input type="date" id="calendar">
+<button id="next">▶</button>
 </header>
 
 <div class="container">
-
 <div id="form">
-  <h3>Нов масаж</h3>
+<h3>Нов масаж</h3>
 
-  <input id="name" placeholder="Име">
+<input id="name" placeholder="Име">
 
-  <select id="duration">
-    <option value="30">30 мин</option>
-    <option value="60">60 мин</option>
-  </select>
+<select id="duration">
+<option value="30">30 мин</option>
+<option value="60">60 мин</option>
+</select>
 
-  <select id="packageSelect">
-    <option value="">Единичен</option>
-    <option value="5">Пакет 5</option>
-    <option value="10">Пакет 10</option>
-  </select>
+<select id="packageSelect">
+<option value="">Единичен</option>
+<option value="5">Пакет 5</option>
+<option value="10">Пакет 10</option>
+</select>
 
-  <select id="time"></select>
+<select id="time"></select>
 
-  <button id="save">Запази</button>
+<button id="save">Запази</button>
 </div>
 
 <div class="slots" id="slots"></div>
 </div>
 
-<!-- Firebase -->
+<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
@@ -64,159 +64,174 @@ button{padding:6px;border:none;border-radius:4px;background:#333;color:#fff}
 firebase.initializeApp({
   apiKey: "AIzaSyDhglQG4GWGN8qHwkkolZsEuZN9o6g9fKg",
   authDomain: "aura-schedule.firebaseapp.com",
-  projectId: "aura-schedule"
+  projectId: "aura-schedule",
+  storageBucket: "aura-schedule.firebasestorage.app",
+  messagingSenderId: "1061955157940",
+  appId: "1:1061955157940:web:7009801b6a5db594ccfce1"
 });
+
 const db = firebase.firestore();
 </script>
 
 <script>
 // ELEMENTS
-const nameInput = document.getElementById('name')
-const timeSelect = document.getElementById('time')
-const durationSelect = document.getElementById('duration')
-const packageSelect = document.getElementById('packageSelect')
-const calendar = document.getElementById('calendar')
-const slotsDiv = document.getElementById('slots')
+const nameInput = document.getElementById('name');
+const durationSelect = document.getElementById('duration');
+const timeSelect = document.getElementById('time');
+const packageSelect = document.getElementById('packageSelect');
+const calendar = document.getElementById('calendar');
+const slotsDiv = document.getElementById('slots');
+const saveBtn = document.getElementById('save');
+const prevBtn = document.getElementById('prev');
+const nextBtn = document.getElementById('next');
 
 // DATE
-let current = new Date()
-const fmt = d => d.toISOString().split('T')[0]
-calendar.value = fmt(current)
-document.getElementById('prev').onclick = ()=>{current.setDate(current.getDate()-1);calendar.value=fmt(current);render()}
-document.getElementById('next').onclick = ()=>{current.setDate(current.getDate()+1);calendar.value=fmt(current);render()}
-calendar.onchange = ()=>{current=new Date(calendar.value);render()}
+let current = new Date();
+const fmt = d => d.toISOString().split('T')[0];
+calendar.value = fmt(current);
+
+prevBtn.onclick = ()=>{ current.setDate(current.getDate()-1); calendar.value=fmt(current); render(); }
+nextBtn.onclick = ()=>{ current.setDate(current.getDate()+1); calendar.value=fmt(current); render(); }
+calendar.onchange = ()=>{ current=new Date(calendar.value); render(); }
 
 // TIMES
-const times=[]
+const times=[];
 for(let h=9;h<19;h++){
-  times.push(`${String(h).padStart(2,'0')}:00`)
-  times.push(`${String(h).padStart(2,'0')}:30`)
+  times.push(`${String(h).padStart(2,'0')}:00`);
+  times.push(`${String(h).padStart(2,'0')}:30`);
 }
 times.forEach(t=>{
-  const o=document.createElement('option')
-  o.value=o.textContent=t
-  timeSelect.appendChild(o)
-})
+  const o=document.createElement('option');
+  o.value=o.textContent=t;
+  timeSelect.appendChild(o);
+});
 
 // FIRESTORE HELPERS
 async function loadDay(){
-  const snap = await db.collection('schedule').doc(fmt(current)).get()
-  return snap.exists ? snap.data() : {}
+  const snap = await db.collection('schedule').doc(fmt(current)).get();
+  return snap.exists ? snap.data() : {};
 }
 async function saveDay(data){
-  await db.collection('schedule').doc(fmt(current)).set(data)
+  await db.collection('schedule').doc(fmt(current)).set(data);
 }
 async function loadClient(name){
-  const snap = await db.collection('clients').doc(name).get()
-  return snap.exists ? snap.data() : null
+  const ref = db.collection('clients').doc(name);
+  const snap = await ref.get();
+  return snap.exists ? snap.data() : null;
 }
 async function saveClient(name,data){
-  await db.collection('clients').doc(name).set(data)
+  await db.collection('clients').doc(name).set(data);
 }
 
 // SAVE
-document.getElementById('save').onclick = async ()=>{
-  if(!nameInput.value || !timeSelect.value) return
+saveBtn.onclick = async ()=>{
+  if(!nameInput.value || !timeSelect.value) return;
 
-  const day = await loadDay()
-  const t = timeSelect.value
-  if(day[t]) return alert('Часът е зает')
+  const day = await loadDay();
+  const t = timeSelect.value;
+  if(day[t]) return;
 
-  let packageTotal = +packageSelect.value || 0
-  let slotNumber = 0
-  let paid = false
+  let slotNumber = 0;
+  let packageTotal = +packageSelect.value || 0;
+  let paid = false;
 
   if(packageTotal){
-    let client = await loadClient(nameInput.value)
+    let client = await loadClient(nameInput.value);
     if(!client){
-      client = {package:packageTotal, used:0, paid:false}
+      client = { package: packageTotal, used: 0, paid: false };
     }
-    client.used++
-    slotNumber = client.used
-    paid = client.paid
-    await saveClient(nameInput.value, client)
+    if(client.used >= client.package){
+      client.used = 0;
+      client.paid = false;
+      client.package = packageTotal;
+    }
+    client.used += 1;
+    slotNumber = client.used;
+    paid = client.paid;
+    await saveClient(nameInput.value, client);
   }
 
   const slot = {
     name: nameInput.value,
     duration: +durationSelect.value,
+    paid,
     package: packageTotal,
     slotNumber,
-    packageTotal,
-    paid
+    packageTotal
+  };
+
+  day[t] = slot;
+
+  if(durationSelect.value==60){
+    const i = times.indexOf(t);
+    if(times[i+1]) day[times[i+1]] = {...slot};
   }
 
-  day[t] = slot
-
-  if(durationSelect.value == 60){
-    const i = times.indexOf(t)
-    if(times[i+1]) day[times[i+1]] = {...slot}
-  }
-
-  await saveDay(day)
-  nameInput.value=''
-  packageSelect.value=''
-  render()
-}
+  await saveDay(day);
+  nameInput.value='';
+  packageSelect.value='';
+  render();
+};
 
 // PAID
 async function markPaid(time){
-  const day = await loadDay()
-  const slot = day[time]
-  if(!slot) return
+  const day = await loadDay();
+  const slot = day[time];
+  if(!slot) return;
 
-  slot.paid = true
-  day[time] = slot
+  slot.paid = true;
+  day[time] = slot;
 
   if(slot.package){
-    const client = await loadClient(slot.name)
-    client.paid = true
-    await saveClient(slot.name, client)
-
+    const client = await loadClient(slot.name);
+    if(client){
+      client.paid = true;
+      await saveClient(slot.name, client);
+    }
     Object.keys(day).forEach(k=>{
-      if(day[k].name === slot.name) day[k].paid = true
-    })
+      if(day[k].name===slot.name) day[k].paid=true;
+    });
   }
 
-  await saveDay(day)
-  render()
+  await saveDay(day);
+  render();
 }
 
 // DELETE
 async function deleteMassage(time){
-  const day = await loadDay()
-  delete day[time]
-  await saveDay(day)
-  render()
+  const day = await loadDay();
+  delete day[time];
+  await saveDay(day);
+  render();
 }
 
 // RENDER
 async function render(){
-  slotsDiv.innerHTML=''
-  const day = await loadDay()
-  const hidden = new Set()
+  slotsDiv.innerHTML='';
+  const day = await loadDay();
+  const hidden=new Set();
 
   times.forEach(t=>{
-    if(hidden.has(t)) return
-    const b = day[t]
-    const d = document.createElement('div')
+    if(hidden.has(t)) return;
+    const b = day[t];
+    const d = document.createElement('div');
 
-    if(!b) d.className='slot free'
-    else if(b.paid) d.className=b.package?'slot packagePaid':'slot paid'
-    else d.className='slot booked'
+    if(!b) d.className='slot free';
+    else if(b.paid) d.className=b.package?'slot packagePaid':'slot paid';
+    else d.className='slot booked';
 
     if(b && b.duration==60){
-      const i=times.indexOf(t)
-      if(times[i+1]) hidden.add(times[i+1])
+      const i=times.indexOf(t);
+      if(times[i+1]) hidden.add(times[i+1]);
     }
 
-    d.innerHTML=`
+    d.innerHTML = `
       <div>
         <b>${t}</b>
         ${b?`<div>${b.name}${b.package?` (${b.slotNumber}/${b.packageTotal})`:''}</div>`:''}
       </div>
       <span>${b?'Заето':'Свободно'}</span>
-    `
+    `;
 
     if(b){
       d.onclick=()=>{
@@ -224,16 +239,16 @@ async function render(){
           <div>
             ${!b.paid?`<button onclick="event.stopPropagation();markPaid('${t}')">Платен</button>`:''}
             <button onclick="event.stopPropagation();deleteMassage('${t}')">Изтрий</button>
-          </div>
-        `
+          </div>`;
       }
     }
 
-    slotsDiv.appendChild(d)
-  })
+    slotsDiv.appendChild(d);
+  });
 }
 
-render()
+render();
 </script>
+
 </body>
 </html>
