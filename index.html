@@ -15,6 +15,7 @@ header{display:flex;justify-content:center;align-items:center;padding:10px;backg
 .slot.free{background:#eaffea}
 .slot.booked{background:#f44336;color:#fff}
 .slot.paid{background:#4caf50;color:#fff}
+.slot.packagePaid{background:#ff9800;color:#fff}
 button{padding:6px;border:none;border-radius:4px;background:#333;color:#fff}
 #form{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px}
 #save{padding:12px;font-size:20px;width:100%}
@@ -31,17 +32,31 @@ button{padding:6px;border:none;border-radius:4px;background:#333;color:#fff}
 
 <div class="container">
 
-  <div id="form">
-    <h3>Нов масаж</h3>
-    <input id="name" placeholder="Име">
-    <select id="time"></select>
-    <button id="save">Запази</button>
-  </div>
+<div id="form">
+  <h3>Нов масаж</h3>
 
-  <div class="slots" id="slots"></div>
+  <input id="name" placeholder="Име">
+
+  <select id="duration">
+    <option value="30">30 мин</option>
+    <option value="60">60 мин</option>
+  </select>
+
+  <select id="packageSelect">
+    <option value="">Единичен</option>
+    <option value="5">Пакет 5</option>
+    <option value="10">Пакет 10</option>
+  </select>
+
+  <select id="time"></select>
+
+  <button id="save">Запази</button>
 </div>
 
-<!-- Firebase SDK -->
+<div class="slots" id="slots"></div>
+</div>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
@@ -58,6 +73,8 @@ const db = firebase.firestore();
 // ELEMENTS
 const nameInput = document.getElementById('name')
 const timeSelect = document.getElementById('time')
+const durationSelect = document.getElementById('duration')
+const packageSelect = document.getElementById('packageSelect')
 const calendar = document.getElementById('calendar')
 const slotsDiv = document.getElementById('slots')
 
@@ -65,9 +82,9 @@ const slotsDiv = document.getElementById('slots')
 let current = new Date()
 const fmt = d => d.toISOString().split('T')[0]
 calendar.value = fmt(current)
-calendar.onchange = () => { current = new Date(calendar.value); render() }
-document.getElementById('prev').onclick = () => { current.setDate(current.getDate()-1); calendar.value=fmt(current); render() }
-document.getElementById('next').onclick = () => { current.setDate(current.getDate()+1); calendar.value=fmt(current); render() }
+document.getElementById('prev').onclick = ()=>{current.setDate(current.getDate()-1);calendar.value=fmt(current);render()}
+document.getElementById('next').onclick = ()=>{current.setDate(current.getDate()+1);calendar.value=fmt(current);render()}
+calendar.onchange = ()=>{current=new Date(calendar.value);render()}
 
 // TIMES
 const times=[]
@@ -89,6 +106,13 @@ async function loadDay(){
 async function saveDay(data){
   await db.collection('schedule').doc(fmt(current)).set(data)
 }
+async function loadClient(name){
+  const snap = await db.collection('clients').doc(name).get()
+  return snap.exists ? snap.data() : null
+}
+async function saveClient(name,data){
+  await db.collection('clients').doc(name).set(data)
+}
 
 // SAVE
 document.getElementById('save').onclick = async ()=>{
@@ -98,20 +122,62 @@ document.getElementById('save').onclick = async ()=>{
   const t = timeSelect.value
   if(day[t]) return alert('Часът е зает')
 
-  day[t] = {
+  let packageTotal = +packageSelect.value || 0
+  let slotNumber = 0
+  let paid = false
+
+  if(packageTotal){
+    let client = await loadClient(nameInput.value)
+    if(!client){
+      client = {package:packageTotal, used:0, paid:false}
+    }
+    client.used++
+    slotNumber = client.used
+    paid = client.paid
+    await saveClient(nameInput.value, client)
+  }
+
+  const slot = {
     name: nameInput.value,
-    paid: false
+    duration: +durationSelect.value,
+    package: packageTotal,
+    slotNumber,
+    packageTotal,
+    paid
+  }
+
+  day[t] = slot
+
+  if(durationSelect.value == 60){
+    const i = times.indexOf(t)
+    if(times[i+1]) day[times[i+1]] = {...slot}
   }
 
   await saveDay(day)
-  nameInput.value = ''
+  nameInput.value=''
+  packageSelect.value=''
   render()
 }
 
-// MARK PAID
+// PAID
 async function markPaid(time){
   const day = await loadDay()
-  day[time].paid = true
+  const slot = day[time]
+  if(!slot) return
+
+  slot.paid = true
+  day[time] = slot
+
+  if(slot.package){
+    const client = await loadClient(slot.name)
+    client.paid = true
+    await saveClient(slot.name, client)
+
+    Object.keys(day).forEach(k=>{
+      if(day[k].name === slot.name) day[k].paid = true
+    })
+  }
+
   await saveDay(day)
   render()
 }
@@ -126,25 +192,35 @@ async function deleteMassage(time){
 
 // RENDER
 async function render(){
-  slotsDiv.innerHTML = ''
+  slotsDiv.innerHTML=''
   const day = await loadDay()
+  const hidden = new Set()
 
   times.forEach(t=>{
+    if(hidden.has(t)) return
     const b = day[t]
     const d = document.createElement('div')
 
     if(!b) d.className='slot free'
-    else if(b.paid) d.className='slot paid'
+    else if(b.paid) d.className=b.package?'slot packagePaid':'slot paid'
     else d.className='slot booked'
 
-    d.innerHTML = `
-      <div><b>${t}</b>${b?`<div>${b.name}</div>`:''}</div>
+    if(b && b.duration==60){
+      const i=times.indexOf(t)
+      if(times[i+1]) hidden.add(times[i+1])
+    }
+
+    d.innerHTML=`
+      <div>
+        <b>${t}</b>
+        ${b?`<div>${b.name}${b.package?` (${b.slotNumber}/${b.packageTotal})`:''}</div>`:''}
+      </div>
       <span>${b?'Заето':'Свободно'}</span>
     `
 
     if(b){
-      d.onclick = ()=>{
-        d.innerHTML += `
+      d.onclick=()=>{
+        d.innerHTML+=`
           <div>
             ${!b.paid?`<button onclick="event.stopPropagation();markPaid('${t}')">Платен</button>`:''}
             <button onclick="event.stopPropagation();deleteMassage('${t}')">Изтрий</button>
